@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
+import torchvision.models as models
+from torchvision.models.resnet import ResNet50_Weights
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
@@ -25,7 +27,77 @@ num_epochs = 30
 early_stopping_patience = 3
 early_stopping_counter = 0
 best_val_acc = 0
-dropout_rate=0.3
+dropout_rate=0.2
+keypoint = [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
 writer = SummaryWriter('id/experiment_3')
 # Load keypoint detection model
 model_pose = MMPoseInferencer(
@@ -63,7 +135,7 @@ class SiameseDataset(Dataset):
 # 读取CSV文件
 image_paths = []
 labels = []
-
+#training dataset
 # 打开CSV文件进行读取
 #ZG0007 - ZG0312
 with open('../KABR/annotation/idtrain1.csv', "r") as file:
@@ -106,11 +178,11 @@ with open('../KABR/annotation/idtrain1.csv', "r") as file:
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
         keypointslist1 = data1[0]['keypoints']
-        keypoints1 = torch.tensor(keypointslist1, dtype=torch.float32)
+        keypoints1 = torch.tensor(keypoint, dtype=torch.float32)
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
         keypointslist2 = data2[0]['keypoints']
-        keypoints2 = torch.tensor(keypointslist2, dtype=torch.float32)
+        keypoints2 = torch.tensor(keypoint, dtype=torch.float32)
         #dataset
         iddata.append((file_path1, keypoints1, file_path2, keypoints2, label))
 #print(iddata)
@@ -119,8 +191,7 @@ dataset = SiameseDataset(iddata, transform=transform)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 
-#VAL DATA
-
+#VAL DATASET
 with open('../KABR/annotation/idval.csv', "r") as file:
     csv_reader = csv.reader(file)
     next(csv_reader)
@@ -160,11 +231,11 @@ with open('../KABR/annotation/idval.csv', "r") as file:
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
         keypointslist1 = data1[0]['keypoints']
-        keypoints1 = torch.tensor(keypointslist1, dtype=torch.float32)
+        keypoints1 = torch.tensor(keypoint, dtype=torch.float32)
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
         keypointslist2 = data2[0]['keypoints']
-        keypoints2 = torch.tensor(keypointslist2, dtype=torch.float32)
+        keypoints2 = torch.tensor(keypoint, dtype=torch.float32)
         valdata.append((file_path1, keypoints1, file_path2, keypoints2, label))
 
 valdataset = SiameseDataset(valdata, transform=transform)
@@ -213,11 +284,11 @@ with open('../KABR/annotation/idtest.csv', "r") as file:
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
         keypointslist1 = data1[0]['keypoints']
-        keypoints1 = torch.tensor(keypointslist1, dtype=torch.float32)
+        keypoints1 = torch.tensor(keypoint, dtype=torch.float32)
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
         keypointslist2 = data2[0]['keypoints']
-        keypoints2 = torch.tensor(keypointslist2, dtype=torch.float32)
+        keypoints2 = torch.tensor(keypoint, dtype=torch.float32)
         testdata.append((file_path1, keypoints1, file_path2, keypoints2, label))
 
 testdataset = SiameseDataset(testdata, transform=transform)
@@ -243,10 +314,11 @@ class SiameseNetwork(nn.Module):
             nn.ReLU(inplace=True)
         )
 '''
+# resnet
 class SiameseNetwork(nn.Module):
     def __init__(self):
         super(SiameseNetwork, self).__init__()
-        
+        '''     
         self.cnn = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=5),
             nn.ReLU(inplace=True),
@@ -259,9 +331,17 @@ class SiameseNetwork(nn.Module):
             nn.Conv2d(128, 128, kernel_size=4),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_rate)   # Dropout after activation
-        )
-        
-        self.fc1 = nn.Linear(46208, 100)
+        )''' 
+
+
+        # Using ResNet50 with specified pretrained weights
+        base_model = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+        # Remove the final fully connected layer
+        self.cnn = nn.Sequential(*list(base_model.children())[:-1])
+
+
+
+        self.fc1 = nn.Linear(2048, 100)
         nn.Dropout(p=dropout_rate),    # Dropout after the first FC layer
         
         self.fc2 = nn.Linear(228, 100)
