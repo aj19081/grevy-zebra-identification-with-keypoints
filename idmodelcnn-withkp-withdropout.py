@@ -22,11 +22,11 @@ valdata = []
 input_size = (100,100)
 batch_size = 100
 num_epochs = 30
-early_stopping_patience = 3
+early_stopping_patience = 10
 early_stopping_counter = 0
 best_val_acc = 0
 dropout_rate=0.3
-writer = SummaryWriter('id/experiment_3')
+writer = SummaryWriter('id/experiment_cnn_kp_dropout_E')
 # Load keypoint detection model
 model_pose = MMPoseInferencer(
     pose2d="mmpose/configs/animal_2d_keypoint/rtmpose/ap10k/rtmpose-m_8xb64-210e_ap10k-256x256.py",
@@ -37,6 +37,11 @@ transform = transforms.Compose([
     transforms.Resize(input_size),
     transforms.ToTensor()
 ])
+
+def calculate_bbox_area(bbox):
+    x_min, y_min, x_max, y_max = bbox
+    return (x_max - x_min) * (y_max - y_min)
+
 
 # 自定义数据集
 class SiameseDataset(Dataset):
@@ -105,11 +110,22 @@ with open('../KABR/annotation/idtrain1.csv', "r") as file:
 
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
-        keypointslist1 = data1[0]['keypoints']
+
+        bbox_list1 = [item["bbox"][0] for item in data1]
+        bbox_areas1 = [calculate_bbox_area(bbox) for bbox in bbox_list1]
+        max_area_index1 = bbox_areas1.index(max(bbox_areas1))
+        keypointslist1 = data1[max_area_index1]['keypoints']
+
         keypoints1 = torch.tensor(keypointslist1, dtype=torch.float32)
+
+
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
-        keypointslist2 = data2[0]['keypoints']
+
+        bbox_list2 = [item["bbox"][0] for item in data2]
+        bbox_areas2 = [calculate_bbox_area(bbox) for bbox in bbox_list2]
+        max_area_index2 = bbox_areas2.index(max(bbox_areas2))
+        keypointslist2 = data2[max_area_index2]['keypoints']
         keypoints2 = torch.tensor(keypointslist2, dtype=torch.float32)
         #dataset
         iddata.append((file_path1, keypoints1, file_path2, keypoints2, label))
@@ -159,11 +175,22 @@ with open('../KABR/annotation/idval.csv', "r") as file:
 
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
-        keypointslist1 = data1[0]['keypoints']
+
+        bbox_list1 = [item["bbox"][0] for item in data1]
+        bbox_areas1 = [calculate_bbox_area(bbox) for bbox in bbox_list1]
+        max_area_index1 = bbox_areas1.index(max(bbox_areas1))
+        keypointslist1 = data1[max_area_index1]['keypoints']
+
         keypoints1 = torch.tensor(keypointslist1, dtype=torch.float32)
+
+
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
-        keypointslist2 = data2[0]['keypoints']
+
+        bbox_list2 = [item["bbox"][0] for item in data2]
+        bbox_areas2 = [calculate_bbox_area(bbox) for bbox in bbox_list2]
+        max_area_index2 = bbox_areas2.index(max(bbox_areas2))
+        keypointslist2 = data2[max_area_index2]['keypoints']
         keypoints2 = torch.tensor(keypointslist2, dtype=torch.float32)
         valdata.append((file_path1, keypoints1, file_path2, keypoints2, label))
 
@@ -212,11 +239,22 @@ with open('../KABR/annotation/idtest.csv', "r") as file:
 
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
-        keypointslist1 = data1[0]['keypoints']
+
+        bbox_list1 = [item["bbox"][0] for item in data1]
+        bbox_areas1 = [calculate_bbox_area(bbox) for bbox in bbox_list1]
+        max_area_index1 = bbox_areas1.index(max(bbox_areas1))
+        keypointslist1 = data1[max_area_index1]['keypoints']
+
         keypoints1 = torch.tensor(keypointslist1, dtype=torch.float32)
+
+
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
-        keypointslist2 = data2[0]['keypoints']
+
+        bbox_list2 = [item["bbox"][0] for item in data2]
+        bbox_areas2 = [calculate_bbox_area(bbox) for bbox in bbox_list2]
+        max_area_index2 = bbox_areas2.index(max(bbox_areas2))
+        keypointslist2 = data2[max_area_index2]['keypoints']
         keypoints2 = torch.tensor(keypointslist2, dtype=torch.float32)
         testdata.append((file_path1, keypoints1, file_path2, keypoints2, label))
 
@@ -324,8 +362,8 @@ criterion = nn.BCELoss()
 #optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.001)
 #optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.15) 
-optimizer = optim.Adam(model.parameters(), lr=0.0001,weight_decay=0.001)
-#optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
+#optimizer = optim.Adam(model.parameters(), lr=0.01)
+optimizer = optim.SGD(model.parameters(), lr=0.001)
 # 训练模型
 for epoch in range(num_epochs):
     model.train()

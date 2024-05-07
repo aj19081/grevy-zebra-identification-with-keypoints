@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
-import torchvision.models as models
-from torchvision.models.resnet import ResNet50_Weights
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
@@ -24,11 +22,10 @@ valdata = []
 input_size = (100,100)
 batch_size = 100
 num_epochs = 30
-early_stopping_patience = 10
-early_stopping_counter = 0
+
 best_val_acc = 0
 dropout_rate=0.3
-writer = SummaryWriter('id/experiment_resnet_kp_dropout_E')
+writer = SummaryWriter('id/basic_0.3_R')
 # Load keypoint detection model
 model_pose = MMPoseInferencer(
     pose2d="mmpose/configs/animal_2d_keypoint/rtmpose/ap10k/rtmpose-m_8xb64-210e_ap10k-256x256.py",
@@ -39,6 +36,11 @@ transform = transforms.Compose([
     transforms.Resize(input_size),
     transforms.ToTensor()
 ])
+
+def calculate_bbox_area(bbox):
+    x_min, y_min, x_max, y_max = bbox
+    return (x_max - x_min) * (y_max - y_min)
+
 
 # 自定义数据集
 class SiameseDataset(Dataset):
@@ -61,9 +63,6 @@ class SiameseDataset(Dataset):
         
         return img1, keypoints1, img2, keypoints2, torch.from_numpy(np.array([label], dtype=np.float32))
 
-def calculate_bbox_area(bbox):
-    x_min, y_min, x_max, y_max = bbox
-    return (x_max - x_min) * (y_max - y_min)
 
 # 读取CSV文件
 image_paths = []
@@ -281,11 +280,10 @@ class SiameseNetwork(nn.Module):
             nn.ReLU(inplace=True)
         )
 '''
-# resnet
 class SiameseNetwork(nn.Module):
     def __init__(self):
         super(SiameseNetwork, self).__init__()
-        '''     
+        
         self.cnn = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=5),
             nn.ReLU(inplace=True),
@@ -298,18 +296,9 @@ class SiameseNetwork(nn.Module):
             nn.Conv2d(128, 128, kernel_size=4),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_rate)   # Dropout after activation
-        )''' 
-
-
-        # Using ResNet50 with specified pretrained weights
-        #base_model = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
-        base_model = models.resnet50(pretrained=False)
-        # Remove the final fully connected layer
-        self.cnn = nn.Sequential(*list(base_model.children())[:-1])
-
-
-
-        self.fc1 = nn.Linear(2048, 100)
+        )
+        
+        self.fc1 = nn.Linear(46208, 100)
         nn.Dropout(p=dropout_rate),    # Dropout after the first FC layer
         
         self.fc2 = nn.Linear(228, 100)
@@ -372,7 +361,7 @@ criterion = nn.BCELoss()
 #optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.001)
 #optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.15) 
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.1)
 #optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
 # 训练模型
 for epoch in range(num_epochs):
@@ -442,15 +431,5 @@ for epoch in range(num_epochs):
 
     print('Epoch [{}/{}], Average Loss: {:.4f}, Validation Accuracy: {:.4f}, Test Accuracy: {:.4f}'.format(epoch+1, num_epochs, average_loss, valaccuracy, accuracy))
 
-
-    # Early Stopping检查
-    if valaccuracy > best_val_acc:
-        best_val_acc = valaccuracy
-        early_stopping_counter = 0  # 重置early_stopping_counter
-    else:
-        early_stopping_counter += 1
-        if early_stopping_counter >= early_stopping_patience:
-            print("Early stopping triggered. Training stopped.")
-            break
 
 print("Training Finished!")

@@ -22,10 +22,10 @@ valdata = []
 input_size = (100,100)
 batch_size = 100
 num_epochs = 30
-early_stopping_patience = 3
+early_stopping_patience = 10
 early_stopping_counter = 0
 best_val_acc = 0
-dropout_rate=0.2
+dropout_rate=0.3
 keypoint = [
       [
         0,
@@ -96,7 +96,7 @@ keypoint = [
         0
       ]
     ]
-writer = SummaryWriter('idwithoutkp/experiment_2')
+writer = SummaryWriter('id/experiment_cnn_no_kp_dropout_E')
 # Load keypoint detection model
 model_pose = MMPoseInferencer(
     pose2d="mmpose/configs/animal_2d_keypoint/rtmpose/ap10k/rtmpose-m_8xb64-210e_ap10k-256x256.py",
@@ -381,7 +381,7 @@ criterion = nn.BCELoss()
 #optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.001)
 #optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.15) 
-optimizer = optim.Adam(model.parameters(), lr=0.0001,weight_decay=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
 # 训练模型
 for epoch in range(num_epochs):

@@ -24,7 +24,7 @@ valdata = []
 input_size = (100,100)
 batch_size = 100
 num_epochs = 30
-early_stopping_patience = 3
+early_stopping_patience = 10
 early_stopping_counter = 0
 best_val_acc = 0
 dropout_rate=0.2
@@ -98,7 +98,7 @@ keypoint = [
         0
       ]
     ]
-writer = SummaryWriter('id/experiment_3')
+writer = SummaryWriter('id/experiment_resnet_no_kp_droupout_E')
 # Load keypoint detection model
 model_pose = MMPoseInferencer(
     pose2d="mmpose/configs/animal_2d_keypoint/rtmpose/ap10k/rtmpose-m_8xb64-210e_ap10k-256x256.py",
@@ -130,6 +130,12 @@ class SiameseDataset(Dataset):
             img2 = self.transform(img2)
         
         return img1, keypoints1, img2, keypoints2, torch.from_numpy(np.array([label], dtype=np.float32))
+
+
+def calculate_bbox_area(bbox):
+    x_min, y_min, x_max, y_max = bbox
+    return (x_max - x_min) * (y_max - y_min)
+
 
 
 # 读取CSV文件
@@ -177,11 +183,22 @@ with open('../KABR/annotation/idtrain1.csv', "r") as file:
 
         with open(f"predictions/{new_path1}", "r") as json_file1:
             data1 = json.load(json_file1)
-        keypointslist1 = data1[0]['keypoints']
+
+        bbox_list1 = [item["bbox"][0] for item in data1]
+        bbox_areas1 = [calculate_bbox_area(bbox) for bbox in bbox_list1]
+        max_area_index1 = bbox_areas1.index(max(bbox_areas1))
+        keypointslist1 = data1[max_area_index1]['keypoints']
+
         keypoints1 = torch.tensor(keypoint, dtype=torch.float32)
+
+
         with open(f"predictions/{new_path2}", "r") as json_file2:
             data2 = json.load(json_file2)
-        keypointslist2 = data2[0]['keypoints']
+
+        bbox_list2 = [item["bbox"][0] for item in data2]
+        bbox_areas2 = [calculate_bbox_area(bbox) for bbox in bbox_list2]
+        max_area_index2 = bbox_areas2.index(max(bbox_areas2))
+        keypointslist2 = data2[max_area_index2]['keypoints']
         keypoints2 = torch.tensor(keypoint, dtype=torch.float32)
         #dataset
         iddata.append((file_path1, keypoints1, file_path2, keypoints2, label))
@@ -335,7 +352,7 @@ class SiameseNetwork(nn.Module):
 
 
         # Using ResNet50 with specified pretrained weights
-        base_model = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+        base_model = models.resnet50(pretrained=False)
         # Remove the final fully connected layer
         self.cnn = nn.Sequential(*list(base_model.children())[:-1])
 
@@ -404,7 +421,7 @@ criterion = nn.BCELoss()
 #optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.001)
 #optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.15) 
-optimizer = optim.Adam(model.parameters(), lr=0.0001,weight_decay=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
 # 训练模型
 for epoch in range(num_epochs):
